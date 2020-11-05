@@ -20,6 +20,7 @@
 
 #include "DStarDefines.h"
 #include "Defs.h"
+#include "Version.h"
 
 CAPRSEntry::CAPRSEntry(const wxString& callsign, const wxString& band, double frequency, double offset, double range, double latitude, double longitude, double agl) :
 m_callsign(callsign),
@@ -326,11 +327,30 @@ void CAPRSWriter::close()
 #endif
 }
 
+unsigned int CAPRSWriter::getAPRSPassword(const wxString& callsign)
+{
+	const char* p = callsign;
+	unsigned int len = ::strlen(callsign);
+
+	wxUint16 hash = 0x73E2U;
+
+	for (unsigned int i = 0U; i < len; i += 2U) {
+		hash ^= (*p++) << 8;
+		hash ^= (*p++);
+	}
+
+	return hash & 0x7FFFU;
+}
+
+
 void CAPRSWriter::sendIdFramesFixed()
 {
 	time_t now;
 	::time(&now);
 	struct tm* tm = ::gmtime(&now);
+
+	unsigned int password = getAPRSPassword(m_gateway);
+	wxString authString = wxString::Format(wxT("user %s-S pass %u vers %s %8.8s\n"), m_gateway.c_str(), password, wxT("ircDDBGateway"), VERSION);
 
 	for (CEntry_t::iterator it = m_array.begin(); it != m_array.end(); ++it) {
 		CAPRSEntry* entry = it->second;
@@ -405,8 +425,8 @@ void CAPRSWriter::sendIdFramesFixed()
 		lon.Replace(wxT(","), wxT("."));
 
 		wxString output;
-		output.Printf(wxT("%s-S>APDG01,TCPIP*,qAC,%s-GS:;%-7s%-2s*%02d%02d%02dz%s%cD%s%caRNG%04.0lf/A=%06.0lf %s %s\r\n"),
-			m_gateway.c_str(), m_gateway.c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
+		output.Printf(wxT("%s%s-S>APDG01,TCPIP*,qAC,%s-GS:;%-7s%-2s*%02d%02d%02dz%s%cD%s%caRNG%04.0lf/A=%06.0lf %s %s\r\n"),
+			authString, m_gateway.c_str(), m_gateway.c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
 			tm->tm_mday, tm->tm_hour, tm->tm_min,
 			lat.c_str(), (entry->getLatitude() < 0.0F)  ? wxT('S') : wxT('N'),
 			lon.c_str(), (entry->getLongitude() < 0.0F) ? wxT('W') : wxT('E'),
@@ -422,8 +442,8 @@ void CAPRSWriter::sendIdFramesFixed()
 		m_aprsSocket.write((unsigned char*)ascii, (unsigned int)::strlen(ascii), m_aprsAddress, m_aprsPort);
 
 		if (entry->getBand().Len() == 1U) {
-			output.Printf(wxT("%s-%s>APDG02,TCPIP*,qAC,%s-%sS:!%s%cD%s%c&RNG%04.0lf/A=%06.0lf %s %s\r\n"),
-				entry->getCallsign().c_str(), entry->getBand().c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
+			output.Printf(wxT("%s%s-%s>APDG02,TCPIP*,qAC,%s-%sS:!%s%cD%s%c&RNG%04.0lf/A=%06.0lf %s %s\r\n"),
+				authString, entry->getCallsign().c_str(), entry->getBand().c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
 				lat.c_str(), (entry->getLatitude() < 0.0F)  ? wxT('S') : wxT('N'),
 				lon.c_str(), (entry->getLongitude() < 0.0F) ? wxT('W') : wxT('E'),
 				entry->getRange() * 0.6214, entry->getAGL() * 3.28, band.c_str(), desc.c_str());
@@ -480,6 +500,9 @@ void CAPRSWriter::sendIdFramesMobile()
 	time_t now;
 	::time(&now);
 	struct tm* tm = ::gmtime(&now);
+
+	unsigned int password = getAPRSPassword(m_gateway);
+	wxString authString = wxString::Format(wxT("user %s-S pass %u vers %s %8.8s\n"), m_gateway.c_str(), password, wxT("ircDDBGateway").c_str(), VERSION);
 
 	for (CEntry_t::iterator it = m_array.begin(); it != m_array.end(); ++it) {
 		CAPRSEntry* entry = it->second;
@@ -550,8 +573,8 @@ void CAPRSWriter::sendIdFramesMobile()
 		lon.Replace(wxT(","), wxT("."));
 
 		wxString output1;
-		output1.Printf(wxT("%s-S>APDG01,TCPIP*,qAC,%s-GS:;%-7s%-2s*%02d%02d%02dz%s%cD%s%ca/A=%06.0lf"),
-			m_gateway.c_str(), m_gateway.c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
+		output1.Printf(wxT("%s%s-S>APDG01,TCPIP*,qAC,%s-GS:;%-7s%-2s*%02d%02d%02dz%s%cD%s%ca/A=%06.0lf"),
+			authString, m_gateway.c_str(), m_gateway.c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
 			tm->tm_mday, tm->tm_hour, tm->tm_min,
 			lat.c_str(), (rawLatitude < 0.0)  ? wxT('S') : wxT('N'),
 			lon.c_str(), (rawLongitude < 0.0) ? wxT('W') : wxT('E'),
@@ -580,14 +603,14 @@ void CAPRSWriter::sendIdFramesMobile()
 
 		if (entry->getBand().Len() == 1U) {
 			if (altitudeSet)
-				output1.Printf(wxT("%s-%s>APDG02,TCPIP*,qAC,%s-%sS:!%s%cD%s%c&/A=%06.0lf"),
-					entry->getCallsign().c_str(), entry->getBand().c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
+				output1.Printf(wxT("%s%s-%s>APDG02,TCPIP*,qAC,%s-%sS:!%s%cD%s%c&/A=%06.0lf"),
+					authString, entry->getCallsign().c_str(), entry->getBand().c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
 					lat.c_str(), (rawLatitude < 0.0)  ? wxT('S') : wxT('N'),
 					lon.c_str(), (rawLongitude < 0.0) ? wxT('W') : wxT('E'),
 					rawAltitude * 3.28);
 			else
-				output1.Printf(wxT("%s-%s>APDG02,TCPIP*,qAC,%s-%sS:!%s%cD%s%c&"),
-					entry->getCallsign().c_str(), entry->getBand().c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
+				output1.Printf(wxT("%s%s-%s>APDG02,TCPIP*,qAC,%s-%sS:!%s%cD%s%c&"),
+					authString, entry->getCallsign().c_str(), entry->getBand().c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(),
 					lat.c_str(), (rawLatitude < 0.0)  ? wxT('S') : wxT('N'),
 					lon.c_str(), (rawLongitude < 0.0) ? wxT('W') : wxT('E'));
 

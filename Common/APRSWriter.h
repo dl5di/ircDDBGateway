@@ -88,6 +88,8 @@ public:
 
 	void close();
 
+	unsigned int getAPRSPassword(const wxString& callsign);	
+	
 private:
 	CTimer             m_idTimer;
 	wxString           m_gateway;
