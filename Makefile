@@ -1,8 +1,8 @@
 export BUILD   ?= debug
 ifeq ($(TARGET), opendv)
-export DATADIR ?= /usr/share/opendv
+export DATADIR ?= /var/home/opendv
 export LOGDIR  ?= /var/log/opendv
-export CONFDIR ?= /etc
+export CONFDIR ?= /etc/opendv
 export BINDIR  ?= /usr/sbin
 else
 export DATADIR ?= /usr/share/ircddbgateway
