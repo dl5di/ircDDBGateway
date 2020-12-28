@@ -275,8 +275,11 @@ void CAPRSWriter::writeData(const wxString& callsign, const CAMBEData& data)
 	if (n != wxNOT_FOUND)
 		body = body.Left(n);
 
+	unsigned int password = getAPRSPassword(m_gateway);
+	wxString authString = wxString::Format(wxT("user %s-S pass %u vers %s %8.8s\n"), m_gateway.c_str(), password, wxT("ircDDBGateway"), VERSION);
+
 	wxString output;
-	output.Printf(wxT("%s,qAR,%s-%s:%s\r\n"), header.c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(), body.c_str());
+	output.Printf(wxT("%s%s,qAR,%s-%s:%s\r\n"), authString, header.c_str(), entry->getCallsign().c_str(), entry->getBand().c_str(), body.c_str());
 
 	char ascii[500U];
 	::memset(ascii, 0x00, 500U);
